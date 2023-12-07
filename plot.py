@@ -6,6 +6,7 @@ import rasterio.mask
 import numpy as np
 import geopandas as gpd
 from shapely.geometry import mapping
+from shapely.ops import unary_union
 from math import ceil
 
 PROCESSES = [
@@ -13,6 +14,7 @@ PROCESSES = [
     ("Denmark", "Denmark+B", "europe.tif", 0, -1, 0, -1, 1.8),
     ("Romania", "Romania", "europe.tif", 0, -1, 0, -1, 1.5),
     ("United Kingdom", "United Kingdom", "europe.tif", 0, -1, 2630, -1, 1.7),
+    (["United Kingdom", "Ireland"], "UKEire", "europe.tif", 0, -1, 1500, -1, 1.7),
 ]
 
 LITO_HEIGHT_WITHOUT_BASE = 10
@@ -25,8 +27,13 @@ df = gpd.read_file("ne_10m_admin_0_countries/ne_10m_admin_0_countries.shp")
 for NAME, OUTNAME, FILE, B0, B1, B2, B3, ASPECT in PROCESSES:
     file = rasterio.open(f"topo/{FILE}")
     dataset = file.read()
-
-    cbox = df.loc[df["ADMIN"] == NAME].iloc[0].geometry
+    if isinstance(NAME, list):
+        geometries = []
+        for n in NAME:
+            geometries.append(df.loc[df["ADMIN"] == n].iloc[0].geometry)
+        cbox = unary_union(geometries)
+    else:
+        cbox = df.loc[df["ADMIN"] == NAME].iloc[0].geometry
 
     country_topography, clipped_transform = rasterio.mask.mask(
         file,
